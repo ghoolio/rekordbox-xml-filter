@@ -321,7 +321,26 @@
         </div>
 
         <div id="exportStep" class="step hidden">
-            <h2><span class="step-number">3</span>Export Filtered XML</h2>
+            <h2><span class="step-number">3</span>Export Settings</h2>
+            
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #dc143c; margin-bottom: 10px;">Track Location Handling:</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="locationOption" value="remove" checked style="accent-color: #dc143c;">
+                        <span><strong>Remove file paths</strong> (Recommended) - Rekordbox will need to relocate tracks</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="locationOption" value="keep" style="accent-color: #dc143c;">
+                        <span><strong>Keep original paths</strong> - Only works if files are in same location</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="locationOption" value="filename" style="accent-color: #dc143c;">
+                        <span><strong>Filename only</strong> - Keeps just the filename, removes full path</span>
+                    </label>
+                </div>
+            </div>
+            
             <button id="exportBtn" class="btn btn-primary">📥 Download Filtered XML</button>
             <div id="progress" class="progress">
                 Processing XML file...
@@ -484,6 +503,9 @@
                 return;
             }
 
+            // Get selected location option
+            const locationOption = document.querySelector('input[name="locationOption"]:checked').value;
+
             progress.style.display = 'block';
             exportBtn.disabled = true;
 
@@ -513,6 +535,9 @@
                             const trackId = track.getAttribute('TrackID');
                             if (!validTrackIds.has(trackId)) {
                                 track.remove();
+                            } else {
+                                // Handle location based on user choice
+                                handleTrackLocation(track, locationOption);
                             }
                         });
                     }
@@ -611,7 +636,20 @@
                     progress.style.display = 'none';
                     exportBtn.disabled = false;
                     
-                    alert(`✅ Filtered XML successfully created!\n${validTrackIds.size} tracks from ${selectedPlaylists.size} playlist(s) exported.`);
+                    let locationMsg = '';
+                    switch(locationOption) {
+                        case 'remove':
+                            locationMsg = ' (File paths removed - Rekordbox will need to relocate tracks)';
+                            break;
+                        case 'filename':
+                            locationMsg = ' (Only filenames kept - easier relocation)';
+                            break;
+                        case 'keep':
+                            locationMsg = ' (Original paths kept)';
+                            break;
+                    }
+                    
+                    alert(`✅ Filtered XML successfully created!\n${validTrackIds.size} tracks from ${selectedPlaylists.size} playlist(s) exported.${locationMsg}`);
                     
                 } catch (error) {
                     progress.style.display = 'none';
@@ -619,6 +657,38 @@
                     alert(`❌ Error exporting: ${error.message}`);
                 }
             }, 100);
+        }
+
+        function handleTrackLocation(track, option) {
+            const location = track.getAttribute('Location');
+            if (!location) return;
+
+            switch(option) {
+                case 'remove':
+                    // Remove the Location attribute entirely
+                    track.removeAttribute('Location');
+                    break;
+                    
+                case 'filename':
+                    // Keep only the filename, remove the path
+                    try {
+                        // Decode URL first
+                        const decodedLocation = decodeURIComponent(location);
+                        // Extract filename from path (works for both Windows and Mac paths)
+                        const filename = decodedLocation.split(/[/\\]/).pop();
+                        // Set just the filename
+                        track.setAttribute('Location', filename);
+                    } catch (e) {
+                        // If decoding fails, try to extract filename anyway
+                        const filename = location.split(/[/\\]/).pop();
+                        track.setAttribute('Location', filename);
+                    }
+                    break;
+                    
+                case 'keep':
+                    // Keep original location unchanged
+                    break;
+            }
         }
     </script>
 </body>
